@@ -1,27 +1,29 @@
 import Stripe from 'stripe';
 
-const allowOrigin = process.env.ALLOW_ORIGIN || '*';
+function setCors(req, res) {
+  const list = (process.env.ALLOW_ORIGIN || '*')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+  const origin = req.headers.origin || '';
+  const allow =
+    list.includes('*') || list.includes(origin)
+      ? origin || (list[0] || '*')
+      : (list[0] || '*');
+
+  res.setHeader('Access-Control-Allow-Origin', allow);
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
 
 export default async function handler(req, res) {
-  // CORS
-  if (req.method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Origin', allowOrigin);
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    return res.status(200).end();
-  }
-  res.setHeader('Access-Control-Allow-Origin', allowOrigin);
+  setCors(req, res);
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  // ⬇️ اقرأ المفتاح من البيئة وتأكد منه
   const key = process.env.STRIPE_SECRET_KEY;
-  if (!key || !/^sk_(test|live)_[A-Za-z0-9]+$/.test(key)) {
-    console.error('Bad STRIPE_SECRET_KEY:', key);
-    return res.status(500).json({ error: 'Server Stripe key misconfigured' });
-  }
+  if (!key) return res.status(500).json({ error: 'Server Stripe key misconfigured' });
   const stripe = new Stripe(key, { apiVersion: '2024-06-20' });
 
   try {
@@ -59,10 +61,9 @@ export default async function handler(req, res) {
       metadata: meta
     });
 
-    return res.status(200).json({ url: session.url });
+    res.status(200).json({ url: session.url });
   } catch (err) {
     console.error('Stripe error:', err);
-    return res.status(400).json({ error: err.message });
+    res.status(400).json({ error: err.message });
   }
 }
-
