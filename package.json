@@ -1,0 +1,8 @@
+{
+  "name": "ddn-api",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "stripe": "^16.6.0"
+  }
+}
