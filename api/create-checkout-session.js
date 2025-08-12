@@ -12,9 +12,17 @@ export default async function handler(req, res) {
   }
   res.setHeader('Access-Control-Allow-Origin', allowOrigin);
 
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' });
+  // ⬇️ اقرأ المفتاح من البيئة وتأكد منه
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key || !/^sk_(test|live)_[A-Za-z0-9]+$/.test(key)) {
+    console.error('Bad STRIPE_SECRET_KEY:', key);
+    return res.status(500).json({ error: 'Server Stripe key misconfigured' });
+  }
+  const stripe = new Stripe(key, { apiVersion: '2024-06-20' });
 
   try {
     const b = req.body || {};
@@ -44,7 +52,7 @@ export default async function handler(req, res) {
       success_url: `${process.env.SUCCESS_URL}?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: process.env.CANCEL_URL,
       customer_creation: 'always',
-      customer_email: b.email,
+      customer_email: b.email || undefined,
       phone_number_collection: { enabled: true },
       allow_promotion_codes: true,
       subscription_data: { metadata: meta },
@@ -57,3 +65,4 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: err.message });
   }
 }
+
